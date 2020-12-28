@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.assess.mapper.SchoolMapper">
+    <!--查询某个学校-->
+    <select id="getSchoolById" resultType="map">
+        SELECT * FROM pg_school WHERE school_id=#{schoolId} and del_state=0
+    </select>
+    <!--查询所有学校-->
+    <select id="getAllSchool" resultType="map">
+        select  * from pg_school where del_state=0
+    </select>
+
+    <!--添加学校-->
+    <insert id="addSchool" parameterType="com.assess.entity.School">
+        INSERT INTO pg_school(school_name,school_tele)
+        VALUES (#{schoolName},#{schoolTele})
+    </insert>
+    <!--删除学校-->
+    <update id="deleteSchool" parameterType="Integer">
+        update   pg_school
+          set del_state=1
+         where school_id=#{schoolId}
+    </update>
+    <!--修改学校信息-->
+    <update id="updateSchool" parameterType="com.assess.entity.School">
+        update   pg_school
+          set school_name=#{schoolName},school_tele=#{schoolTele}
+         where school_id=#{schoolId}
+    </update>
+    <!--判断院系编号是否存在-->
+    <select id="checkCollegeCode" resultType="map">
+        select college_code from pg_school_college where college_code=#{collegeCode}
+        and school_id=#{schoolId} and dele_id=0
+    </select>
+    <!--判断院系名称是否存在-->
+    <select id="checkCollegeName" resultType="map">
+        select college_name from pg_school_college where college_name=#{collegeName}
+        and school_id=#{schoolId} and dele_id=0
+    </select>
+    <!--新增院系-->
+    <insert id="addCollege" parameterType="com.assess.entity.College">
+        insert into pg_school_college(school_id, college_name,college_code)
+        value (#{schoolId},#{collegeName},#{collegeCode})
+    </insert>
+    <!--修改院系-->
+    <update id="updateCollege" parameterType="com.assess.entity.College">
+        update pg_school_college
+          set college_name=#{collegeName},school_id=#{schoolId},college_code=#{collegeCode}
+        where college_id=#{collegeId}
+    </update>
+    <!--判断院系下是否有专业-->
+    <select id="isExistCollegeMajor" resultType="map">
+        select * from pg_major where college_id=#{collegeId} and dele_id=0 limit 1
+    </select>
+    <!--删除院系-->
+    <update id="deleteCollege" parameterType="com.assess.entity.College">
+        update pg_school_college
+          set dele_id=1
+        where college_id=#{collegeId} and school_id=#{schoolId}
+    </update>
+    <!--查询某个院系-->
+    <select id="getCollegeById" resultType="map">
+        select * from pg_school_college a
+        left join pg_school b on a.school_id=b.school_id
+        where  a.dele_id=0 and college_id=#{collegeId}
+    </select>
+    <!--查询所有院系-->
+    <select id="getAllCollege" resultType="map">
+        select
+          a.college_id,a.college_code,college_name,b.school_id,school_name
+        from pg_school_college a
+        left join pg_school b on a.school_id=b.school_id
+         where  a.dele_id=0  and a.school_id=#{schoolId}
+         order by college_code
+    </select>
+    <!--验证专业编号是否存在-->
+    <select id="checkMajorCode"  resultType="map">
+        select major_code from pg_major a
+         left join pg_school_college b
+         on a.college_id=b.college_id
+         where major_code=#{majorCode}  and a.dele_id=0 and b.school_id=#{schoolId}
+    </select>
+    <!--验证专业名称是否存在-->
+    <select id="checkMajorName" resultType="map">
+        select major_code from pg_major a
+         left join pg_school_college b
+         on a.college_id=b.college_id
+         where major_name=#{majorName}   and a.dele_id=0 and b.school_id=#{schoolId}
+    </select>
+    <!--新增专业-->
+    <insert id="addMajor" parameterType="com.assess.entity.Major">
+        insert into pg_major(college_id, major_name, major_code,dele_id)
+        values(#{collegeId},#{majorName},#{majorCode},0)
+    </insert>
+    <!--查询所有专业-->
+    <select id="getAllMajor" resultType="map">
+        select a.major_id,a.major_code,major_name,a.college_id,b.college_name,c.school_name from pg_major a
+        left join pg_school_college b on a.college_id=b.college_id
+        left join pg_school c on b.school_id=c.school_id
+        where a.dele_id=0 and c.school_id=#{schoolId}
+        order by major_code
+    </select>
+    <!--查询某个专业-->
+    <select id="getMajorById" resultType="map">
+        select a.major_id,a.major_code,major_name,b.college_id,b.college_name,c.school_id,c.school_name from pg_major a
+            left join pg_school_college b on a.college_id=b.college_id
+            left join pg_school c on b.school_id=c.school_id
+        where a.major_id=#{majorId} and a.dele_id=0
+
+    </select>
+    <!--修改某个专业-->
+    <update id="updateMajor" parameterType="com.assess.entity.Major">
+        update pg_major
+          set major_name=#{majorName},college_id=#{collegeId},major_code=#{majorCode}
+        where major_id=#{majorId}
+    </update>
+    <!--删除专业之前判断是否有已经参与评估的专业-->
+    <select id="isExistAssessMajor" resultType="map">
+        select * from  pg_start_assess_major where major_id=#{majorId} limit 1
+    </select>
+    <!--删除专业-->
+    <update id="deleteMajor" parameterType="com.assess.entity.Major">
+        update pg_major
+          set dele_id=1
+        where major_id=#{majorId}
+    </update>
+    <!--批量添加学院-->
+    <insert id="addColleges" parameterType="com.assess.entity.College">
+        insert into pg_school_college(school_id, college_name,college_code)
+        values
+        <foreach collection="college" item="c1" separator=",">
+            (#{c1.schoolId},#{c1.collegeName},#{c1.collegeCode})
+        </foreach>
+    </insert>
+    <!--批量添加专业-->
+    <insert id="addMajors" parameterType="com.assess.entity.Major">
+        insert into pg_major(major_code, major_name,college_id)
+        values
+        <foreach collection="major" item="c1" separator=",">
+            (#{c1.majorCode},#{c1.majorName},#{c1.collegeId})
+        </foreach>
+    </insert>
+</mapper>

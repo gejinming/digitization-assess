@@ -1,0 +1,946 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.assess.mapper.AssessPublicMapper">
+    <!--查询没有用过的4个评估体系模板-->
+    <select id="getYearAssess" resultType="map">
+       select * from pg_target a
+       left join pg_user b on a.create_user_id=b.user_id
+        where a.state_id=0
+       and a.del_state=0
+       and b.school_id=#{schoolId}
+       order by target_year desc limit 4
+    </select>
+    <!--暂时没用-->
+    <select id="getNewYearAssess" resultType="map">
+       select * from pg_target  where target_year=#{year}
+    </select>
+    <!--查询-->
+    <select id="getAssessTargetYear" resultType="map">
+         select target_year from pg_target  where target_id=#{targetId}
+    </select>
+    <!--添加评估体系模板-->
+    <insert id="addNewAssessModel" useGeneratedKeys="true" keyProperty="targetId" parameterType="com.assess.entity.TargetModel">
+        insert into pg_target(target_year,target_name,create_user_id,create_date)
+        value(#{targetYear},#{targetName},#{createUserId},now())
+    </insert>
+    <!--查询目前已评估最大评估的年度-->
+    <select id="getAssessMaxYear" resultType="map">
+
+      select
+          max(target_year) as targetyear
+      from pg_target a
+      left join pg_user b on a.create_user_id=b.user_id
+      where a.state_id=1
+           and a.del_state=0
+           and b.school_id=#{schoolId}
+    </select>
+    <!--判断评估体系是否再用-->
+    <select id="isUserTarget" resultType="map">
+        select state_id from pg_target where target_id=#{targetId}
+    </select>
+    <!--删除评估体系模板开始-->
+        <!--删除评估体系模板1-->
+        <update id="delTarger" parameterType="Integer">
+            update pg_target set del_state=1,del_user=#{userId},del_date=now()
+            where target_id=#{targetId}
+        </update>
+        <!--删除指标类型2-->
+        <delete id="deltargetTypes">
+            delete from pg_target_type where target_id=#{targetId}
+        </delete>
+        <!--删除具体指标3-->
+        <update id="deltargetTypedetail">
+            update   pg_target_detail  set del_state=1 where target_id=#{targetId}
+        </update>
+    <!--删除评估体系模板结束-->
+    <!--添加评估体系类型-->
+    <insert id="addNewAssessTypeModel" useGeneratedKeys="true" keyProperty="targetTypeId" parameterType="com.assess.entity.TargetType">
+        insert into pg_target_type(target_id,target_type_name)
+        value(#{targetId},#{targetTypeName})
+    </insert>
+
+    <!--发起评估保存数据-->
+    <insert id="addNewAssess"  useGeneratedKeys="true" keyProperty="assessId" parameterType="com.assess.entity.StartAssess">
+        insert into pg_start_assess(assess_center,target_id,first_publictime,first_endtime,
+          second_publictime,second_endtime,stuff_url,create_user_id,state_id)
+          values(#{assessCenter},#{targetId},#{firstPublictime},#{firstEndtime},
+          #{secondPublictime},#{secondEndtime},#{stuffUrl},#{createUserId},0)
+    </insert>
+
+    <!--发起评估提示信息-->
+    <select id="getAssessHindInfo" resultType="map">
+        SELECT
+          assess_center,first_publictime,first_endtime,second_publictime,second_endtime
+        FROM pg_start_assess
+        WHERE  target_id=#{targetId}
+    </select>
+    <!--是否提示-->
+    <select id="getAssessHindState" resultType="map">
+        select hind_id from pg_user where user_id=#{userId}
+    </select>
+    <!--设置提示信息状态-->
+    <update id="setAssessInfo" parameterType="Integer">
+        update  pg_user set hind_id=#{hindId}
+        where school_id=#{schoolId}
+        <if test="userId!=0">
+           and  user_id=#{userId}
+        </if>
+
+    </update>
+
+
+    <!--将开启评估时选择的评估体系修改为1已用状态-->
+    <update id="updateStartTarget" parameterType="Integer">
+        update pg_target set state_id=#{stateId},target_year=#{targetYear} where target_id=#{targetId}
+    </update>
+    <!--查询有专业的院系-->
+    <select id="getAllCollege" resultType="map">
+        select
+          DISTINCT  a.college_id,college_name,school_name
+        from pg_school_college a
+        left join pg_school b on a.school_id=b.school_id
+		inner join pg_major c on c.college_id=a.college_id and c.dele_id=0
+         where  a.dele_id=0 and a.school_id=#{schoolId}
+    </select>
+    <!--查询所有专业-->
+    <select id="getAllCollegeMajor" resultType="map">
+        select a.college_id,a.college_name,b.major_id,b.major_name from pg_school_college a
+        left join pg_major b  on a.college_id=b.college_id
+        where b.dele_id=0 and a.school_id=#{schooId}
+    </select>
+    <!--添加发起评估的专业-->
+    <insert id="addAssessMajor" parameterType="com.assess.entity.StartAssess">
+        insert into pg_start_assess_major(assess_id,major_id,state_id,check_state_id)  values
+        <foreach collection="majorIds" index="index" item="item" separator=",">
+          ( #{assessId}, #{item},0,0 )
+        </foreach>
+    </insert>
+    <!--创建指标内容-->
+    <!--判断指标序号是否存在-->
+    <select id="getIndexNumIsExist" resultType="map">
+        SELECT index_num FROM pg_target_detail where target_id=#{targetId} and index_num=#{indexNum} and del_state=0
+    </select>
+    <insert id="addTargetDetail"  useGeneratedKeys="true" keyProperty="targetDetailId" parameterType="com.assess.entity.TargetDetail">
+        INSERT INTO
+          pg_target_detail
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            target_type_id,index_num,target_content,score,score_unit,target_explain,arithmetic_id,target_id
+          <if test="itemA!=null and itemA!='' ">
+              ,item_a
+          </if>
+          <if test="itemB!=null and itemB!='' ">
+           ,item_b
+          </if>
+          <if test="stuffUrl!=null and stuffUrl!=''">
+            ,stuff_url
+          </if>
+          <if test="arithmeticId==3">
+            ,arithmetic_three
+          </if>
+           <if test="arithmeticId==4">
+                ,arithmetic_four_title
+           </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+        #{targetTypeId},#{indexNum},#{targetContent},#{score},#{scoreUnit},#{targetExplain},#{arithmeticId},#{targetId}
+            <if test="itemA!=null and itemA!='' ">
+                ,#{itemA}
+            </if>
+            <if test="itemB!=null and itemB!='' ">
+                ,#{itemB}
+            </if>
+            <if test="stuffUrl!=null and stuffUrl!='' ">
+                ,#{stuffUrl}
+            </if>
+            <if test="arithmeticId==3">
+                ,#{arithmeticThree}
+            </if>
+            <if test="arithmeticId==4">
+                ,#{arithmeticFourTitle}
+            </if>
+
+        </trim>
+    </insert>
+    <!--修改指标明细-->
+    <update id="updateTargetDetail"  parameterType="com.assess.entity.TargetDetail">
+        update pg_target_detail
+        <trim prefix="set"  suffixOverrides=",">
+            target_type_id=#{targetTypeId},target_content=#{targetContent},score=#{score}
+            ,score_unit=#{scoreUnit},target_explain=#{targetExplain},arithmetic_id=#{arithmeticId}
+
+            <if test="itemA!=null and itemA!=''">
+                ,item_a=#{itemA}
+            </if>
+            <if test="itemB!=null and itemB!=''">
+                ,item_b=#{itemB}
+            </if>
+            <if test="stuffUrl!=null and stuffUrl!=''">
+                ,stuff_url=#{stuffUrl}
+            </if>
+            <if test="arithmeticId==3">
+                ,arithmetic_three=#{arithmeticThree}
+            </if>
+            <if test="arithmeticId==4">
+                ,arithmetic_four_title=#{arithmeticFourTitle}
+            </if>
+        </trim>
+        where target_detail_id=#{targetDetailId}
+    </update>
+    <!--删除指标类型-->
+    <delete id="delTargetType" parameterType="Integer">
+        delete  from pg_target_type where target_type_id=#{TargetTypeId}
+    </delete>
+    <!--删除指标类型时删除指标内容-->
+    <delete id="delTargetDetail2" parameterType="Integer">
+        delete from pg_target_detail where target_type_id=#{TargetTypeId}
+    </delete>
+    <!--删除指标-->
+    <delete id="delTargetDetail" parameterType="Integer">
+        delete from pg_target_detail where target_detail_id=#{targetDetailId}
+    </delete>
+    <!--查询所有的算法-->
+    <select id="getAllArithmetic" resultType="map">
+        select arithmetic_id,arithmetic_center from pg_arithmetic
+    </select>
+    <!--根据评估体系id获取所有的指标类型-->
+    <select id="getTargetAllType" resultType="map">
+        select target_type_id,target_type_name from pg_target_type where target_id=#{targetId}
+    </select>
+    <!--根据评估体系类型id查询此类型所有的指标数据-->
+    <select id="getAllTargetDetail" resultType="map">
+        select a.*,b.assess_id from pg_target_detail a
+        left join pg_start_assess b on  a.target_id=b.target_id
+         where target_type_id=#{targetTypeId}
+         order by a.index_num asc
+    </select>
+    <!--根据评估体系id查询此体系所有的类型-->
+    <select id="getAllTargetType" resultType="com.assess.entity.TargetType">
+        select * from pg_target_type where target_id=#{targetId}
+    </select>
+
+    <select id="getAllTargetType1" resultType="map">
+        select * from pg_target_type where target_id=#{targetId}
+    </select>
+
+    <!--统计所有评估体系模板的指标数和类型数-->
+    <select id="getAllTarget" resultType="map">
+        select
+         a.target_id,a.target_name,a.create_date,a.state_id,count(b.target_id) as sumtype,ifnull(sumdetial,0) as sumtarget
+            from pg_target a
+            left join pg_target_type b
+            on a.target_id=b.target_id
+            left join pg_user cc
+            on a.create_user_id=cc.user_id
+            left join (
+                select f.target_id,count(g.target_type_id)  as sumdetial
+                from pg_target_type f
+                    left join pg_target_detail g
+                    on f.target_type_id=g.target_type_id
+                    group by f.target_id
+            ) c
+            on c.target_id=a.target_id
+            where del_state=0 and cc.school_id=#{schoolId}
+            group by a.target_id
+            order by a.target_id desc
+    </select>
+    <!--统计这个评估体系各专业综合得分及排名-->
+    <select id="getTargetAllMajorScore" resultType="map">
+            select a.target_id,major_id,score,b.assess_id
+             from
+                  (
+                        select target_id,major_id,sum(ifnull(score,0)) as score
+                        from pg_target_type_date
+                        where target_id=#{targetId}
+                        group by target_id,major_id
+                        order by sum(score) desc
+                        ) a
+	        left join pg_start_assess b on a.target_id=b.target_id
+            order by score desc
+    </select>
+    <!--统计得分添加进第一次公示表里-->
+   <insert id="addFirstTargetMajorScore" parameterType="Integer">
+          insert into pg_firstpublic(assess_id,major_id,count_score,ranking,target_id,state_id,appel_state)
+           select dd.assess_id,dd.major_id,dd.score,@rank:=@rank + 1 AS rank_no,dd.target_id,0,0 from (
+				select b.target_id,c.major_id,ifnull(score,0) as score,b.assess_id
+             from pg_start_assess b
+						 left join  pg_start_assess_major c  on b.assess_id=c.assess_id
+						 left join
+                          (
+                            select target_id,major_id,sum(ifnull(score,0)) as score
+                            from pg_target_type_date
+                            where target_id=#{targetId}
+                            group by target_id,major_id
+                            order by sum(score) desc
+                           ) a
+	         on a.target_id=b.target_id and a.major_id=c.major_id
+			where b.target_id=#{targetId}
+            order by score desc
+					)dd, (SELECT @rank:= 0) b
+    </insert>
+    <!--查询第一次公示数据-->
+    <select id="firstPublicMajorScore" resultType="map">
+        select c.first_endtime,b.target_name,b.target_year,d.major_name,a.*
+        from pg_firstpublic a
+        left join pg_target b  on a.target_id=b.target_id
+        left join pg_start_assess c on a.assess_id=c.assess_id
+        left join pg_major d on a.major_id=d.major_id
+        where a.target_id=#{targetId} and a.state_id=#{stateId}
+        order by ranking
+    </select>
+    <!--教务处领导审核第一次公示改状态-->
+    <update id="updateCheckFirstState" parameterType="Integer">
+          update pg_firstpublic set state_id=#{stateId},check_user=#{userId},check_time=now()
+           where assess_id=#{assessId}
+    </update>
+    <!--查询这个专业第一次公示的成绩-->
+    <select id="getFirstMajorScore" resultType="map">
+        select a.*,b.major_name,c.first_endtime from pg_firstpublic a
+        left join pg_major b
+        on a.major_id=b.major_id
+        left join pg_start_assess c
+        on a.assess_id=c.assess_id
+        where public_id=#{publicId}
+    </select>
+    <!--查询指标模板和对应专业这个指标的数据-->
+    <select id="findFirstInfo" resultType="map">
+          select
+            c.assess_id,a.*,b.data_id,b.item_a_data,item_b_data,b.score as sumscore,b.stuff_url as stuff,
+           b.state_id,b.arithmetic_four_data
+            from pg_target_detail a
+            left join (
+							select b.* from (
+                                        select * from pg_target_type_date
+                                         where major_id=#{majorId}
+                                          and state_id &lt;= #{publicState}
+                                        order by state_id desc LIMIT 50000
+
+                                ) b
+									  group by b.target_detail_id,b.target_id,b.major_id
+						) b on a.target_detail_id=b.target_detail_id
+			left join pg_start_assess c
+		    on c.target_id=a.target_id
+            where target_type_id=#{targetTypeId}
+            order by a.index_num asc
+    </select>
+    <!--专业第一次公示申诉-->
+    <insert id="addPublicMajorAppeal" parameterType="com.assess.entity.MajorAppel">
+        insert into pg_major_appel(public_id,appel_state,appel_reason,appel_stuffurl,appel_user,public_count,appel_time)
+        values(#{publicId},0,#{appelReason},#{appelStuffurl},#{appelUser},#{publicCount},now())
+    </insert>
+    <!--此专业第一次公示表状态改为申诉状态-->
+    <update id="updateFirstPublicState" parameterType="Integer">
+        update pg_firstpublic set appel_state=#{stateId} where public_id=#{publicId}
+    </update>
+    <!--教务处审核专业申诉，通过或驳回-->
+    <update id="updatePublicMajorAppeal" parameterType="com.assess.entity.MajorAppel">
+        update pg_major_appel set
+        appel_state=#{appelState},check_reason=#{checkReason},reject_stuffurl=#{rejectStuffurl},
+        check_user_id=#{checkUserId},check_date=now()
+        where public_id=#{publicId} and public_count=#{publicCount}
+    </update>
+    <!--查询此专业申诉理由及附件-->
+    <select id="getMajorAppelReason" resultType="map">
+        select
+            appel_id,appel_reason,appel_stuffurl,appel_time,check_reason,reject_stuffurl,check_user_id,b.user_name,check_date
+            from pg_major_appel a
+            left join pg_user b on a.check_user_id=b.user_id
+        where public_id=#{publicId} and public_count=#{publicCount}
+    </select>
+    <!--第一次公示查询申诉专业列表-->
+    <select id="getMajorFirstAppelList" resultType="map">
+         select a.public_id,a.target_id,a.assess_id,a.major_id,b.major_name,ifnull(c.score,0) as count_score,c.ranking
+         from  pg_firstpublic a
+        left join pg_major b on a.major_id=b.major_id
+				left join (
+
+								  select dd.assess_id,dd.target_id,dd.major_id,dd.score ,@rank:=@rank + 1 AS ranking
+									from (
+                                         select  a.assess_id,a.target_id,b.major_id,ifnull(sumscore,0) as score
+												from  pg_start_assess a
+												left join pg_start_assess_major b on a.assess_id=b.assess_id
+												left join (
+												  select  c.target_id,c.major_id,sum(ifnull( c.score,0)) as sumscore from
+														(
+																		select b.* from
+																		(
+																						select * from pg_target_type_date
+																						where target_id=#{targetId}
+																						order by state_id desc LIMIT 50000
+
+																		) b
+																		group by b.target_detail_id,b.target_id,b.major_id
+															)c
+                                                    group by  c.target_id,c.major_id
+                                                    order by sum(ifnull(score,0)) desc
+												) c
+												on c.target_id=a.target_id and b.major_id=c.major_id
+													where a.target_id=#{targetId}
+												 order by sumscore desc
+                ) dd, (SELECT @rank:= 0) b
+		  ) c on a.major_id=c.major_id
+         where a.target_id=#{targetId} and a.appel_state=#{stateId}
+    </select>
+    <!--第二次公示查询申诉专业列表-->
+    <select id="getMajorSecondAppelList" resultType="map">
+        select a.public_id,a.target_id,a.assess_id,a.major_id,b.major_name,c.score as count_score,c.ranking
+         from  pg_secondpublic a
+        left join pg_major b on a.major_id=b.major_id
+				left join (
+								 select dd.assess_id,dd.major_id,dd.score,@rank:=@rank + 1 AS ranking,dd.target_id
+								 from (
+										select a.target_id,major_id,score,b.assess_id
+												 from
+															(
+
+
+																		select c.target_id,c.major_id,sum(ifnull(score,0)) as score from
+																		(
+																			select b.* from
+																				(
+																								select * from pg_target_type_date
+																								where target_id=#{targetId}
+																								order by state_id desc LIMIT 50000
+
+																				) b
+																			group by b.target_detail_id,b.target_id,b.major_id
+																		) c
+																			group by  c.target_id,c.major_id
+																			order by sum(ifnull(score,0)) desc
+
+
+																	) a
+                                                    left join pg_start_assess b on a.target_id=b.target_id
+                                                    order by score desc
+					)dd, (SELECT @rank:= 0) b
+		  ) c on a.major_id=c.major_id
+         where a.target_id=#{targetId} and a.appel_state=#{stateId}
+    </select>
+    <!--查询发起评估的已提交或未提交材料的专业成绩及排名-->
+    <select id="getMajorSummitList" resultType="map">
+	select a.* ,@rank:=@rank + 1 AS rank_no from (
+			select
+					dd.target_id,ifnull(b.score,0) as score,a.assess_id,a.major_id,c.major_name
+			from  pg_start_assess_major  a
+			left join pg_start_assess dd
+			on a.assess_id=dd.assess_id
+			 left join (
+                        select target_id,major_id,sum(ifnull(score,0)) as score
+                        from pg_target_type_date
+                        where target_id=#{targetId} and state_id=0
+                        group by target_id,major_id
+                        order by sum(score) desc
+								) b
+			  on a.major_id=b.major_id
+			 left join pg_major c
+			 on a.major_id=c.major_id
+			 where a.state_id=#{stateId} and dd.target_id=#{targetId}
+			 order by score desc
+	 ) a, (SELECT @rank:= 0) b
+    </select>
+
+    <!--专业申诉修改数据保存-->
+    <insert id="addMajorDataWriteMa" useGeneratedKeys="true" keyProperty="dataId" parameterType="com.assess.entity.MajorData">
+        INSERT INTO pg_target_type_date
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            target_detail_id,major_id,score,state_id,target_id
+            <if test="arithmeticId==1 || arithmeticId==2|| arithmeticId==3 ">
+                ,item_a_data
+            </if>
+            <if test="arithmeticId==1 || arithmeticId==3">
+                ,item_b_data
+            </if>
+            <if test="arithmeticId==4">
+                ,arithmetic_four_data
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{targetDetailId},#{majorId},#{score},#{stateId},#{targetId}
+            <if test="arithmeticId==1 || arithmeticId==2|| arithmeticId==3">
+                ,#{itemAData}
+            </if>
+            <if test="arithmeticId==1 || arithmeticId==3">
+                ,#{itemBData}
+            </if>
+            <if test="arithmeticId==4">
+                ,#{arithmeticFourData}
+            </if>
+        </trim>
+    </insert>
+    <!--第二次公示统计数据-->
+    <insert id="addMajorSecondPublic" parameterType="com.assess.entity.PublicScore" >
+        	insert into pg_secondpublic(assess_id,state_id,appel_state,target_id,major_id,count_score,ranking)
+            select dd.assess_id,0,0,dd.target_id,dd.major_id,dd.sumscore ,@rank:=@rank + 1 AS rank_no from (
+                        select  a.assess_id,a.target_id,b.major_id,ifnull(sumscore,0) as sumscore
+												from  pg_start_assess a
+												left join pg_start_assess_major b on a.assess_id=b.assess_id
+												left join (
+												  select  c.target_id,c.major_id,sum(ifnull( c.score,0)) as sumscore from
+														(
+																		select b.* from
+																		(
+																						select * from pg_target_type_date
+																						where target_id=#{targetId}
+																						order by state_id desc LIMIT 50000
+
+																		) b
+																		group by b.target_detail_id,b.target_id,b.major_id
+															)c
+                                                        group by  c.target_id,c.major_id
+                                                        order by sum(ifnull(score,0)) desc
+                                                  ) c
+                                                on c.target_id=a.target_id and b.major_id=c.major_id
+                                                where a.target_id=#{targetId}
+                                                order by sumscore desc
+                    ) dd, (SELECT @rank:= 0) b
+
+    </insert>
+    <!--教务处领导审核第二次公示列表-->
+    <select id="getCheckSecondPublic" resultType="map">
+        select a.*,b.major_name,c.second_endtime,d.target_name,d.target_year from pg_secondpublic a
+        left join pg_major b on a.major_id=b.major_id
+				left join pg_start_assess c on a.assess_id=c.assess_id
+				left join pg_target d on a.target_id=d.target_id
+        where a.target_id=#{targetId} and a.state_id=0
+        order by ranking
+    </select>
+    <!--教务处领导审核第二次公示得分，通过之后再公示-->
+    <update id="updateCheckSecondPublic" parameterType="Integer">
+        update pg_secondpublic set state_id=#{stateId},check_user=#{userId},check_time=now()
+           where target_id=#{targetId}
+    </update>
+    <!--第二次公示-->
+    <select id="getSecondPublic" resultType="map">
+        select a.*,b.major_name,c.second_endtime,d.target_name,d.target_year from pg_secondpublic a
+        left join pg_major b on a.major_id=b.major_id
+				left join pg_start_assess c on a.assess_id=c.assess_id
+				left join pg_target d on a.target_id=d.target_id
+        where a.target_id=#{targetId} and a.state_id=1
+        order by ranking
+    </select>
+    <!--查询这个专业第二次公示的成绩-->
+    <select id="getSecondMajorScore" resultType="map">
+        select a.*,b.major_name,c.second_endtime from pg_secondpublic a
+        left join pg_major b
+        on a.major_id=b.major_id
+        left join pg_start_assess c
+        on a.assess_id=c.assess_id
+        where public_id=#{publicId}
+    </select>
+    <!--第二次公示专业申诉改变此专业成绩状态-->
+    <update id="updateSecondPublicState" parameterType="Integer">
+      update pg_secondpublic set appel_state=#{stateId} where public_id=#{publicId}
+    </update>
+    <!--获取此专业第一次公示时申诉的理由及材料-->
+    <select id="getMajorFirstAPPel" parameterType="Integer" resultType="map">
+        SELECT a.* FROM pg_major_appel a
+        left join pg_firstpublic b
+         on a.public_id=b.public_id
+        where a.public_count=1 and b.major_id=#{majorId} and b.target_id=#{targetId}
+    </select>
+    <!--最终公示统计排名-->
+    <insert id="addMajorFinalPublic" parameterType="com.assess.entity.PublicScore" >
+        	insert into pg_finalpublic(assess_id,state_id,target_id,major_id,count_score,ranking,star_level,red_card,yellow_card,orange_card)
+            select dd.assess_id,0,dd.target_id,dd.major_id,dd.sumscore ,@rank:=@rank + 1 AS rank_no,0,0,0,0 from (
+                        select  a.assess_id,a.target_id,b.major_id,ifnull(sumscore,0) as sumscore
+												from  pg_start_assess a
+												left join pg_start_assess_major b on a.assess_id=b.assess_id
+												left join (
+												  select  c.target_id,c.major_id,sum(ifnull( c.score,0)) as sumscore from
+														(
+																		select b.* from
+																		(
+																						select * from pg_target_type_date
+																						where target_id=#{targetId}
+																						order by state_id desc LIMIT 50000
+
+																		) b
+																		group by b.target_detail_id,b.target_id,b.major_id
+															)c
+
+
+                                                    group by  c.target_id,c.major_id
+                                                    order by sum(ifnull(score,0)) desc
+												) c
+						on c.target_id=a.target_id and b.major_id=c.major_id
+						where a.target_id=#{targetId}
+						order by sumscore desc
+                    ) dd, (SELECT @rank:= 0) b
+
+    </insert>
+    <!--查询本次评估最终列表-->
+    <select id="getFinalPublicMajor" parameterType="Integer" resultType="map">
+        select * from pg_finalpublic where target_id=#{targetId}
+    </select>
+    <!--查询此专业是否有排名后十的评估-->
+    <select id="getMajorLastRanking" resultType="map">
+        select assess_id from pg_finalpublic
+         where major_id=#{majorId} and   ranking <![CDATA[>]]> #{ranking} and  assess_id <![CDATA[!= ]]> #{assessId}
+        order by assess_id desc limit 1
+    </select>
+
+    <!--统计星级的专业并出现次数-->
+    <select id="getMajorStarLevel" resultType="map">
+         select major_id,count(major_id) as num from pg_finalpublic a
+            inner join pg_start_assess b on a.assess_id=b.assess_id
+            where star_level>0 and red_card=0 and yellow_card=0 and orange_card=0
+            and b.state_id=1 and major_id=#{majorId} and a.assess_id <![CDATA[>]]> #{assessId}
+            group by major_id
+    </select>
+    <!--查询此专业排名后十之后的评估星级数-->
+    <select id="getMajorStarLevelNum" resultType="map">
+        select star_level from pg_finalpublic
+        where assess_id  <![CDATA[>]]>  #{assessId} and major_id=#{majorId}
+        and star_level>0 and red_card=0 and yellow_card=0 and orange_card=0
+        and state_id=1
+        order by assess_id desc limit 1
+    </select>
+    <!---->
+    <select id="getAssessId" resultType="map">
+        select assess_id from pg_start_assess where target_id=#{targetId}
+    </select>
+    <!--查询此专业是否连续两次评估为黄牌-->
+    <select id="getMajorTwice" resultType="map">
+        SELECT
+          yellow_card,target_id
+        FROM
+          pg_finalpublic
+        WHERE
+          assess_id <![CDATA[<]]> #{assessId} AND major_id = #{majorId}
+        ORDER BY
+        assess_id desc
+        LIMIT 1
+    </select>
+    <!--统计黄牌的专业并出现次数-->
+    <select id="getMajorYellowCode" resultType="map">
+        select major_id,count(major_id) as num from pg_finalpublic a
+        inner join pg_start_assess b on a.assess_id=b.assess_id
+        where star_level=0 and red_card=0 and yellow_card=1 and orange_card=0 and b.state_id=1 and major_id=#{majorId}
+        group by major_id
+    </select>
+    <!--统计橙牌的专业并出现次数-->
+    <select id="getMajorOrangeCode" resultType="map">
+          select major_id,count(major_id) as num from pg_finalpublic a
+            inner join pg_start_assess b on a.assess_id=b.assess_id
+            where star_level=0 and red_card=0 and yellow_card=0 and orange_card=1 and b.state_id=1 and major_id=#{majorId}
+            group by major_id
+    </select>
+    <!--统计红的专业并出现次数-->
+    <select id="getMajorRedCode" resultType="map">
+        select major_id,count(major_id) as num from pg_finalpublic a
+        inner join pg_start_assess b on a.assess_id=b.assess_id
+        where star_level=0 and red_card=1 and yellow_card=0 and orange_card=0 and b.state_id=1 and major_id=#{majorId}
+        group by major_id
+    </select>
+    <!--修改此次评估的星级，首次、累计2次、3次前五名分别3星4星5星-->
+    <update id="updateMajorStarLevel" parameterType="integer">
+        update pg_finalpublic set star_level=#{starLevel}
+        where target_id=#{targetId} and major_id=#{majorId}
+    </update>
+    <!--黄牌-->
+    <update id="updateMajorYellowCode" parameterType="integer">
+        update pg_finalpublic set yellow_card=#{yellowCode},orange_card=0,red_card=0,star_level=0
+        where target_id=#{targetId} and major_id=#{majorId}
+    </update>
+    <!--橙牌-->
+    <update id="updateMajorOrangeCode" parameterType="integer">
+        update pg_finalpublic set orange_card=#{orangeCode},red_card=0,star_level=0,yellow_card=0
+        where target_id=#{targetId} and major_id=#{majorId}
+    </update>
+    <!--红牌-->
+    <update id="updateMajorRedCode" parameterType="integer">
+        update pg_finalpublic set red_card=#{redCode},orange_card=0,star_level=0,yellow_card=0
+        where target_id=#{targetId} and major_id=#{majorId}
+    </update>
+    <!--教务处领导审核最终公示列表-->
+    <select id="getCheckFinalPublicList" resultType="map">
+        select a.*,b.major_name,c.second_endtime,d.target_name,d.target_year from pg_finalpublic a
+        left join pg_major b on a.major_id=b.major_id
+				left join pg_start_assess c on a.assess_id=c.assess_id
+				left join pg_target d on a.target_id=d.target_id
+        where a.target_id=#{targetId} and a.state_id=0
+        order by ranking
+    </select>
+    <!--教务处领导审最终公示得分，通过之后再公示-->
+    <update id="updateCheckFinalPublic" parameterType="Integer">
+        update pg_finalpublic set state_id=#{stateId},check_user=#{userId},check_time=now()
+           where target_id=#{targetId}
+    </update>
+    <!--评估结束修改状态-->
+    <update id="updataStartAssess" parameterType="Integer">
+        update pg_start_assess set state_id=1 where target_id=#{targetId}
+    </update>
+    <!--教务处领导审核通过的最终公示列表-->
+    <select id="getFinalPublic" resultType="map">
+        select a.*,b.major_name,c.second_endtime,d.target_name,d.target_year from pg_finalpublic a
+        left join pg_major b on a.major_id=b.major_id
+				left join pg_start_assess c on a.assess_id=c.assess_id
+				left join pg_target d on a.target_id=d.target_id
+        where a.target_id=#{targetId} and a.state_id=1
+        order by ranking
+    </select>
+    <!--查询这个专业最终公示的成绩-->
+    <select id="getFinalMajorScore" resultType="map">
+        select a.*,b.major_name,c.second_endtime from pg_finalpublic a
+        left join pg_major b
+        on a.major_id=b.major_id
+        left join pg_start_assess c
+        on a.assess_id=c.assess_id
+        where public_id=#{publicId}
+    </select>
+    <!--专业通览历年评估排名及总分-->
+    <select id="getMajorFinalPublic" resultType="map" parameterType="Integer">
+    select
+		b.target_id,b.target_year,b.target_name,c.major_name,a.count_score,a.ranking,a.star_level,a.red_card,a.yellow_card,orange_card,d.first_publictime,d.second_publictime
+	from pg_finalpublic a
+	left join pg_target b on a.target_id=b.target_id
+	left join pg_major c on a.major_id=c.major_id
+	left join pg_start_assess d on a.target_id=d.target_id
+	left join pg_user e on b.create_user_id=e.user_id
+	where a.major_id=#{majorId} and a.state_id=1 and e.school_id=#{schoolId}
+    </select>
+    <!--评估档案 教务处查询所有已结束的评估,并统计参与专业个数，星级专业数，红橙黄榜数  -->
+    <select id="getAllAssessPublic" resultType="map">
+        select a.target_id,a.assess_id,c.target_name,c.target_year,b.num,a.first_publictime,a.second_endtime,d.starNum,d.cardNum
+        from pg_start_assess a
+        left join
+        (
+            select assess_id,count(assess_id) as num  from pg_start_assess_major
+            group by  assess_id
+        )b
+        on a.assess_id=b.assess_id
+        inner join pg_target c
+        on c.target_id=a.target_id and del_state=0
+        left join pg_user dd
+        on dd.user_id=c.create_user_id
+		left join
+		(
+					select
+							assess_id,target_id,starNum,sum(orangeNum+redNum+yellowNum) as cardNum
+						from
+						(
+								SELECT
+
+									a.target_id,a.assess_id,
+									sum(case  when star_level>0 then 1 else 0 end) as starNum,
+									sum(case  when yellow_card>0 then 1 else 0 end) as yellowNum,
+									sum(case  when orange_card>0 then 1 else 0 end ) as orangeNum,
+									sum(case  when red_card>0 then 1 else 0 end ) as redNum
+								FROM
+									pg_finalpublic a
+
+								GROUP BY
+									a.assess_id,
+									a.target_id
+							) aa
+					GROUP BY
+                    assess_id,
+                    target_id
+		 ) d on a.assess_id=d.assess_id and a.target_id=d.target_id
+        where  a.state_id=1 and dd.school_id=#{schoolId}
+        order by a.first_publictime desc
+    </select>
+    <!--教务处领导需要审核的列表 条件评估没有结束和没有最终审核的-->
+    <select id="getAllAssessCheck" resultType="map">
+        select a.assess_id,a.target_id,b.target_name,b.target_year,a.first_publictime,a.second_endtime,c.num,a.check_id
+        from pg_start_assess a
+        left join pg_target b on a.target_id=b.target_id
+        left join
+        (
+        select assess_id,count(assess_id) as num  from pg_start_assess_major
+        group by  assess_id
+        )c
+        on a.assess_id=c.assess_id
+        left join pg_user e on b.create_user_id=e.user_id
+        where a.state_id=0 and e.school_id=#{schoolId} and a.check_id >0 <![CDATA[and   a.check_id<3]]>
+    </select>
+    <!--更改审核到第几次状态-->
+    <update id="updateCheckAssess">
+        update pg_start_assess set check_id=#{stateId} where target_id=#{targetId}
+    </update>
+    <!--查询数字化评估进行到哪个阶段,因为每次评估只能进行一个体系，只有这个结束才能进行下一个-->
+    <select id="findTargetStage" resultType="map">
+        select
+          a.target_id,check_id,first_publictime,first_endtime,second_endtime,second_publictime
+        from pg_start_assess a
+        left join pg_target b on a.target_id=b.target_id
+        left join pg_user  c on b.create_user_id=c.user_id
+          where a.state_id=0 and school_id=#{schoolId}
+    </select>
+    <!--第一次公示专业申诉状态反馈-->
+    <select id="getMajorAppelFirstState" resultType="map" parameterType="Integer">
+        select   a.*  from pg_major_appel a
+        left join pg_firstpublic  b
+        on a.public_id=b.public_id
+        where a.public_count=1 and b.target_id=#{targetId} and b.major_id=#{majorId}
+    </select>
+    <!--第二次公示专业申诉状态反馈-->
+    <select id="getMajorAppelSecondState" resultType="map" parameterType="Integer">
+        select   a.*  from pg_major_appel a
+        left join pg_secondpublic  b
+        on a.public_id=b.public_id
+        where a.public_count=2 and b.target_id=#{targetId} and b.major_id=#{majorId}
+    </select>
+    <!--星级榜列表-->
+    <select id="getStarLevelList" parameterType="Integer" resultType="map">
+        select b.major_name,c.college_name,b.major_id,a.target_id  from pg_finalpublic a
+        left join pg_major b on a.major_id=b.major_id
+        left join pg_school_college c on b.college_id=c.college_id
+        where a.star_level=#{starLevel} and a.target_id=#{targetId} and a.state_id=#{stateId}
+    </select>
+    <!--黄榜-->
+    <select id="getYellowList" parameterType="Integer" resultType="map">
+        select b.major_name,c.college_name,b.major_id,a.target_id  from pg_finalpublic a
+        left join pg_major b on a.major_id=b.major_id
+        left join pg_school_college c on b.college_id=c.college_id
+        where a.yellow_card=1 and a.target_id=#{targetId} and a.state_id=#{stateId}
+    </select>
+    <!--橙榜-->
+    <select id="getOrangeList" parameterType="Integer" resultType="map">
+        select b.major_name,c.college_name,b.major_id,a.target_id  from pg_finalpublic a
+        left join pg_major b on a.major_id=b.major_id
+        left join pg_school_college c on b.college_id=c.college_id
+        where a.orange_card=1 and a.target_id=#{targetId} and a.state_id=#{stateId}
+    </select>
+    <!--红榜-->
+    <select id="getRedList" parameterType="Integer" resultType="map">
+        select b.major_name,c.college_name,b.major_id,a.target_id  from pg_finalpublic a
+        left join pg_major b on a.major_id=b.major_id
+        left join pg_school_college c on b.college_id=c.college_id
+        where a.red_card=1 and a.target_id=#{targetId} and a.state_id=#{stateId}
+    </select>
+    <!--判断各公示是否已生成-->
+    <select id="isExistPublic" resultType="map">
+        select * from ${table} where target_id=#{targetId} limit 1
+    </select>
+    <!--导入评估模板开始-->
+
+    <!--添加评估体系类型-->
+    <insert id="addTargetType" useGeneratedKeys="true" keyProperty="targetTypeId" parameterType="com.assess.entity.AssessDemo">
+        insert into pg_target_type(target_id,target_type_name)
+        value(#{targetId},#{targetTypeName})
+    </insert>
+
+    <insert id="addTargetDetils"  parameterType="com.assess.entity.AssessDemo">
+        INSERT INTO
+        pg_target_detail
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            target_type_id,index_num,target_content,score,score_unit,target_explain,arithmetic_id,target_id
+            <if test="itemA!=null and itemA!='' ">
+                ,item_a
+            </if>
+            <if test="itemB!=null and itemB!='' ">
+                ,item_b
+            </if>
+            <if test="arithmeticId==3">
+                ,arithmetic_three
+            </if>
+            <if test="arithmeticId==4">
+                ,arithmetic_four_title
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{targetTypeId},#{indexNum},#{targetContent},#{score},#{scoreUnit},#{targetExplain},#{arithmeticId},#{targetId}
+            <if test="itemA!=null and itemA!='' ">
+                ,#{itemA}
+            </if>
+            <if test="itemB!=null and itemB!='' ">
+                ,#{itemB}
+            </if>
+            <if test="arithmeticId==3">
+                ,#{arithmeticThree}
+            </if>
+            <if test="arithmeticId==4">
+                ,#{arithmeticFourTitle}
+            </if>
+
+        </trim>
+    </insert>
+    <!--导入模板结束-->
+
+    <!--统计指标个数-->
+    <select id="getAssessIndexNum" resultType="map">
+        select count(index_num) as num from pg_target_detail
+        where target_id=#{targetId}
+        group by target_id
+    </select>
+    <!--查询参与评估的并没有提交的专业-->
+    <select id="getAssessMajor" resultType="map">
+        select b.major_id,major_name from pg_start_assess a
+            left join pg_start_assess_major b
+            on a.assess_id=b.assess_id
+            left join pg_major c
+            on b.major_id=c.major_id
+        where a.target_id=#{targetId}
+    </select>
+    <!--查询评估体系的所有指标-->
+    <select id="getAssessIndexInfo" resultType="map">
+        select * from pg_target_detail a
+        inner join pg_target_type b on a.target_type_id=b.target_type_id
+        where a.target_id=#{targetId} and del_state=0
+        order by a.index_num
+    </select>
+    <!--删除同一个评估模板指标编号重复的指标明细-->
+    <delete id="deleRepetIndex">
+        delete from  pg_target_detail where target_id=#{targetId} and index_num=#{indexNum}
+    </delete>
+    <!--查询同一个评估模板中指标类型相同类型Id-->
+    <select id="getRepetTargetType" resultType="map">
+        select target_type_id from pg_target_type where target_id=#{targetId} and target_type_name=#{targetTypeName}
+    </select>
+    <!--删除发起评估-->
+    <delete id="deleAssess">
+        delete from pg_start_assess where target_id=#{targetId}
+    </delete>
+    <!--删除发起评估的专业-->
+    <delete id="deleAssessMajor">
+        delete from pg_start_assess_major where assess_id=#{assessId}
+    </delete>
+    <!--删除评估数据-->
+    <delete id="deleAssessData">
+        delete from pg_target_type_date where target_id=#{targetId}
+    </delete>
+    <!--删除第一次公示表数据-->
+    <delete id="deleFirstPublic">
+        delete from pg_firstpublic where target_id=#{targetId}
+    </delete>
+    <!--删除第二次公示表数据-->
+    <delete id="deleSecondPublic">
+        delete from pg_secondpublic where target_id=#{targetId}
+    </delete>
+    <!--删除第三次公示表数据-->
+    <delete id="deleFinalPublic">
+        delete from pg_finalpublic where target_id=#{targetId}
+    </delete>
+    <!--根据targetId获取学校-->
+    <select id="getSchool" resultType="map">
+        select a.target_year,c.school_id,c.school_name  from pg_target a
+        left join pg_user b
+        on a.create_user_id=b.user_id
+        left join pg_school c
+        on b.school_id=c.school_id
+        where target_id=#{targetId}
+    </select>
+
+    <select id="getStarLevelNum" resultType="map">
+        select major_name,college_name from pg_finalpublic a
+        left join pg_major b
+        on a.major_id=b.major_id
+        left join pg_school_college c
+        on b.college_id=c.college_id
+         where target_id=#{targetId} and star_level=#{level}
+    </select>
+
+    <select id="getYellowRedOrange" resultType="map">
+        select major_name,college_name from pg_finalpublic a
+            left join pg_major b
+            on a.major_id=b.major_id
+            left join pg_school_college c
+            on b.college_id=c.college_id
+        where a.target_id=#{targetId}
+         and a.yellow_card=#{yellow}
+         and a.orange_card=#{orange}
+         and a.red_card=#{red}
+    </select>
+</mapper>

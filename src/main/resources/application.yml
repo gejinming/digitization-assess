@@ -1,0 +1,10 @@
+mybatis:
+  # 指定全局配置文件位置
+  config-location: classpath:mybatis-config.xml
+  # 指定sql映射文件位置
+  mapper-locations: classpath:mybatis/mapper/*.xml
+  #打印sql
+logging.level.com.assess.mapper: debug
+
+
+

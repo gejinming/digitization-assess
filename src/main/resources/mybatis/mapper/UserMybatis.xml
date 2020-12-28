@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.assess.mapper.UserMapper">
+
+    <!--<select id="getSchoolById" resultType="com.assess.entity.School">
+        SELECT * FROM pg_user WHERE school_id=#{schoolId}
+    </select>-->
+    <!--查询所有用户-->
+    <select id="getAllUser" resultType="map">
+       SELECT
+            a.*,role_name,(case when organ_type=1 then d.job_name else c.major_name end)as major_name,
+            e.college_name,f.school_name
+        FROM
+            pg_user a
+            LEFT JOIN pg_user_role b ON a.role_id = b.role_id
+            left join pg_major c on a.major_id=c.major_id
+            left join pg_job d on a.job_id=d.job_id
+            left join pg_school_college e on c.college_id=e.college_id
+            left join pg_school f  ON a.school_id = f.school_id
+        where a.state_id=0
+         and b.tag_id=#{tagId} and f.del_state=0
+         <if test="tagId!=2">
+          and a.school_id=#{schoolId}
+         </if>
+        order by user_id asc
+    </select>
+    <!--删除用户，更改用户状态即可-->
+    <update id="deleUser" parameterType="com.assess.entity.User">
+        update pg_user set state_id=1 where user_id=#{userId}
+    </update>
+    <select id="getUserByid" resultType="map">
+        select * from pg_user where user_id=#{userId}
+    </select>
+    <!--修改密码-->
+    <update id="updatePassWord" parameterType="com.assess.entity.User">
+        update pg_user set password=#{password} where user_id=#{userId}
+    </update>
+    <!--添加用户-->
+    <insert id="insertUser" parameterType="com.assess.entity.User">
+        insert into pg_user(user_name,job_num,password,sex,phone,major_id,role_id,organ_type,job_id,school_id)
+         values(#{userName},#{jobNum},#{password},#{sex},#{phone},#{majorId},#{roleId},#{organType},#{jobId},#{schoolId})
+    </insert>
+    <!--根据条件筛选用户-->
+    <select id="getUser" resultType="map">
+        SELECT
+            user_id,job_num,user_name,phone,sex,role_name,
+        (case when organ_type=1 then d.job_name else c.major_name end)as major_name
+        FROM
+            pg_user a
+            LEFT JOIN pg_user_role b ON a.role_id = b.role_id
+            left join pg_major c on a.major_id=c.major_id
+            left join pg_job d on a.job_id=d.job_id
+        where a.state_id=0
+        <if test="jobNum!=null">
+            and job_num like concat('%',#{jobNum},'%')
+        </if>
+        <if test="userName!=null">
+            and user_name like concat('%',#{userName},'%')
+        </if>
+        <if test="roleId!=null">
+            and a.role_id=#{roleId}
+        </if>
+        <if test="majorId!=null">
+            and a.major_id=#{majorId}
+        </if>
+
+        order by user_id asc
+    </select>
+    <!--验证工号是否存在-->
+    <select id="checkJobNum" resultType="map">
+        select * from pg_user where job_num=#{jobNum} and state_id=0 and school_id=#{schoolId}
+    </select>
+    <!--修改用户信息 -->
+    <update id="updateUser" parameterType="com.assess.entity.User">
+        update pg_user set
+          job_num=#{jobNum},
+          user_name=#{userName},password=#{password},sex=#{sex},phone=#{phone},major_id=#{majorId},role_id=#{roleId},
+          organ_type=#{organType},job_id=#{jobId}, school_id=#{schoolId}
+        where user_id=#{userId}
+    </update>
+    <!--查询所有角色-->
+    <select id="getAllRole" resultType="com.assess.entity.UserRole">
+        select  role_id,role_name,power_id,role_detail,tag_id from pg_user_role
+        where tag_id=#{tagId}
+        <if test="schoolId !=0">
+            and  school_id=#{schoolId}
+        </if>
+    </select>
+    <!--查询所有角色-->
+    <select id="getAllRole1" resultType="map">
+        select  role_id,role_name,power_id,role_detail from pg_user_role
+        where school_id=#{schoolId} and tag_id=#{tagId}
+    </select>
+    <!--查询某个角色信息-->
+    <select id="getRoleInfo" resultType="map" parameterType="Integer">
+        select  role_id,role_name,power_id,role_detail from pg_user_role  where role_id=#{roleId}
+    </select>
+    <!--修改角色信息-->
+    <update id="updateRoleInfo" parameterType="com.assess.entity.UserRole">
+          update pg_user_role set role_name=#{roleName} ,role_detail=#{roleDetail}
+          where role_id=#{roleId}
+    </update>
+    <!--删除角色-->
+    <delete id="deleRole" parameterType="Integer">
+        delete from pg_user_role where role_id=#{roleId}
+    </delete>
+    <!--查询最大的roleId-->
+    <select id="getMaxRoleId" resultType="map">
+        select max(role_id) as role_id from pg_user_role
+    </select>
+    <!--新增角色信息-->
+    <insert id="addRole" useGeneratedKeys="true" keyProperty="roleId"  parameterType="com.assess.entity.UserRole" >
+        insert into pg_user_role(role_name,role_detail,power_id,school_id,tag_id)
+        values (#{roleName},#{roleDetail},0,#{schoolId},3)
+    </insert>
+    <update id="updatePowerId" parameterType="Integer">
+        update pg_user_role set power_id=role_id where role_id=#{roleId}
+    </update>
+    <!--查询所有专业-->
+    <select id="getAllMajor" resultType="map">
+       select a.major_id,major_name,b.college_id,b.college_name,c.school_name from pg_major a
+        left join pg_school_college b on a.college_id=b.college_id
+        left join pg_school c on b.school_id=c.school_id
+        where a.dele_id=0 and c.school_id=#{schoolId}
+    </select>
+    <!--查询所有的菜单-->
+    <select id="getAllmenu" resultType="map">
+        select
+          menu_id,menu_name,menu_level,parent_menu
+        from pg_menu
+        where menu_id <![CDATA[!= ]]> 10080
+        order by menu_id,menu_level asc
+    </select>
+    <!--查询这个角色的菜单权限-->
+    <select id="getRolePower" resultType="map">
+      select
+        a.role_id,a.role_name,c.menu_id,c.menu_name
+      from pg_user_role a
+        left join pg_power_menu b on a.power_id=b.power_id
+        left join pg_menu c on b.menu_id=c.menu_id
+        where a.role_id=#{roleId}
+        order by c.menu_id asc
+    </select>
+    <!--删除权限-->
+    <delete id="delRolePower" parameterType="Integer">
+        delete from pg_power_menu where power_id=#{powerId}
+    </delete>
+    <!--添加权限-->
+    <insert id="addRolePower" parameterType="Integer">
+        insert into pg_power_menu(power_id, menu_id)
+        values
+        <foreach collection="menuIds" index="index" item="item" separator=",">
+            ( #{powerId}, #{item})
+        </foreach>
+    </insert>
+    <!--获取组织机构列表-->
+    <select id="getAllOrganization" resultType="map">
+        select organ_id,organ_name from pg_organization where del_id=0
+    </select>
+    <!--获取职务列表-->
+    <select id="getAllJob" resultType="map">
+        select * from pg_job
+    </select>
+    <!--批量导入用户-->
+    <insert id="addUsers" parameterType="com.assess.entity.User">
+        insert into pg_user(user_name,job_num,password,sex,phone,major_id,role_id,organ_type,job_id,school_id)
+        values
+        <foreach collection="user" item="u1" separator=",">
+            (#{u1.userName},#{u1.jobNum},1234,#{u1.sex},#{u1.phone},#{u1.majorId},#{u1.roleId},#{u1.organType},#{u1.jobId},#{u1.schoolId})
+        </foreach>
+
+    </insert>
+    <select id="organizationList" resultType="map" parameterType="Integer">
+
+        select job_id as major_id,job_name as major_name,0 as major_code from pg_job
+
+            UNION all
+
+            select major_id,major_name,major_code
+            from pg_major a
+            left join pg_school_college  b
+            on a.college_id=b.college_id
+            where a.dele_id=0 and b.school_id=#{schoolId}
+    </select>
+</mapper>

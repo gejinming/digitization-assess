@@ -1,0 +1,18 @@
+
+spring:
+  datasource:
+    #   数据源基本配置
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://200.200.11.111:3306/digitization-assess?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=UTC
+  servlet:
+    multipart: #配置文件上传
+      max-file-size: 1000MB #设置上传的单个文件最大值，单位可以是 MB、KB，默认为 1MB
+      max-request-size: 1024MB #设置多文件上传时，单次内多个文件的总量的最大值，单位可以是 MB、KB，默认为 10 M
+
+
+
+
+
+

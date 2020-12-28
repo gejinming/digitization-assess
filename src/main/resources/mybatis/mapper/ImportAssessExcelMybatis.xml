@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.assess.mapper.ImportAssessDataMapper">
+        <resultMap id="BaseResultMap" type="com.assess.entity.Major" >
+            <id column="college_id" property="college_id" jdbcType="INTEGER" />
+            <result column="major_name" property="major_name" jdbcType="VARCHAR" />
+            <result column="major_code" property="major_code" jdbcType="VARCHAR" />
+            <result column="dele_id" property="dele_id" javaType="INTEGER"/>
+        </resultMap>
+
+    <insert id="addMajor" parameterType="com.assess.entity.Major">
+            INSERT INTO pg_major(college_id, major_name,major_code, dele_id)
+            VALUES
+            <foreach collection="major" item="jl" separator=",">
+                (#{jl.collegeId},#{jl.majorName},#{jl.majorCode},0)
+            </foreach>
+    </insert>
+    <select id="getAllMajor" resultType="com.assess.entity.Major">
+        select * from  pg_major
+    </select>
+    <select id="getAllCollege" resultType="com.assess.entity.College">
+            select * from  pg_school_college
+    </select>
+    <!--批量导入用户-->
+    <insert id="addUsers" parameterType="com.assess.entity.User">
+         insert into pg_user(user_name,job_num,password,sex,phone,major_id,role_id,organ_type,job_id)
+         values
+         <foreach collection="user" item="u1" separator=",">
+             (#{u1.userName},#{u1.jobNum},1234,#{u1.sex},#{u1.phone},#{u1.majorId},#{u1.roleId},#{u1.organType},#{u1.jobId})
+         </foreach>
+
+    </insert>
+
+
+</mapper>

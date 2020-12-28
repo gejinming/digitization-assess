@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.assess.mapper.MajorDataWriteMapper">
+    <!--获取指标模板的信息-->
+    <select id="getTargetDetail" resultType="map">
+        SELECT * FROM pg_target_detail WHERE target_detail_id=#{targetDatailId}
+    </select>
+    <!--专业填数据保存-->
+    <insert id="addMajorDataWrite" useGeneratedKeys="true" keyProperty="dataId" parameterType="com.assess.entity.MajorData">
+        INSERT INTO pg_target_type_date
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            target_detail_id,major_id,score,state_id,target_id
+            <if test="arithmeticId==1 || arithmeticId==2|| arithmeticId==3 ">
+                ,item_a_data
+            </if>
+            <if test="arithmeticId==1 || arithmeticId==3">
+                ,item_b_data
+            </if>
+            <if test="arithmeticId==4">
+                ,arithmetic_four_data
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+          #{targetDetailId},#{majorId},#{score},0,#{targetId}
+            <if test="arithmeticId==1 || arithmeticId==2|| arithmeticId==3">
+                ,#{itemAData}
+            </if>
+            <if test="arithmeticId==1 || arithmeticId==3">
+                ,#{itemBData}
+            </if>
+            <if test="arithmeticId==4">
+                ,#{arithmeticFourData}
+            </if>
+        </trim>
+    </insert>
+    <!--修改数据-->
+    <update id="updateMajorDataWrite"  parameterType="com.assess.entity.MajorData">
+        update pg_target_type_date
+        <trim prefix="set"  suffixOverrides=",">
+          score=#{score},state_id=#{stateId},target_id=#{targetId}
+            <if test="arithmeticId==1 || arithmeticId==2|| arithmeticId==3">
+                ,item_a_data=#{itemAData}
+            </if>
+            <if test="arithmeticId==1 || arithmeticId==3">
+                ,item_b_data=#{itemBData}
+            </if>
+            <if test="arithmeticId==4">
+                ,arithmetic_four_data=#{arithmeticFourData}
+            </if>
+        </trim>
+      where data_id=#{dataId}
+    </update>
+    <!--专业填写数据完成将此专业材料提交状态改为已提交-->
+    <update id="updateAssessMajor" parameterType="Integer">
+        update pg_start_assess_major set state_id=1
+         where assess_id=#{assessId} and major_id=#{majorId}
+    </update>
+    <!--导入评估数据与手动填写的数据重复时删除手动填写的-->
+    <delete id="deleRepetitData">
+        delete from pg_target_type_date
+        where target_id=#{targetId} and target_detail_id=#{targetDetailId} and major_id=#{majorId}
+    </delete>
+</mapper>
