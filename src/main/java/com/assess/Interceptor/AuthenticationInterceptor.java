@@ -1,21 +1,17 @@
 package com.assess.Interceptor;
 
 import com.assess.Common.CustomerDefinedException;
-import com.assess.Common.GloablExceptionHandler;
 import com.assess.mapper.UserMapper;
 import com.assess.Annotation.PassToken;
-import com.assess.Annotation.UserLoginToken;
 import com.assess.Common.JwtTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.config.CustomEditorConfigurer;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.lang.reflect.Method;
 
 

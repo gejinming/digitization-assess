@@ -22,8 +22,8 @@ import java.util.ArrayList;
 /**
  * swagger configuration
  *
- * @author zjj
- * @since 2019-07-02
+ * @author gjm
+ * @since 2020-01-02
  */
 
 @Configuration
